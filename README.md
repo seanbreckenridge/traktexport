@@ -36,4 +36,3 @@ Then, to export all your ratings/movies/shows, run:
 The results are printed to STDOUT, so `> dump.json` saves it to `dump.json`
 
 ### Inspect
-

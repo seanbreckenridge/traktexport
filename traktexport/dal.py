@@ -1,7 +1,7 @@
 # some DAL https://beepb00p.xyz/exports.html#dal
 # code to parse the export into an ADT-like format
 #
-# this uses dataclasses so that I can possibly
+# this uses dataclasses sometimes so that I can possibly
 # fix datetimes for items which I watched
 # a *long* time ago, i.e. movies I watched
 # as a kid but added when I created my account
@@ -52,6 +52,12 @@ class Show(NamedTuple):
     ids: SiteIds
 
 
+class Season(NamedTuple):
+    number: int
+    ids: SiteIds
+    show: Show
+
+
 class Episode(NamedTuple):
     title: str
     season: int
@@ -91,10 +97,12 @@ class WatchListEntry(NamedTuple):
     media_data: Union[Movie, Show]
 
 
-class Rating(NamedTuple):
+@dataclass
+class Rating:
     rated_at: datetime
     rating: int
     media_type: str
+    media_data: Union[Movie, Show, Season, Episode]
 
 
 class TraktExport(NamedTuple):
@@ -105,6 +113,7 @@ class TraktExport(NamedTuple):
     stats: Dict[str, Any]
     settings: Dict[str, Any]
     watchlist: List[WatchListEntry]
+    ratings: List[Rating]
 
 
 def _parse_trakt_datetime(ds: str) -> datetime:
@@ -151,7 +160,7 @@ def _parse_likes(d: Any) -> Iterator[Like]:
         elif media_type == "list":
             media_data = _parse_trakt_list(media_data_raw)
         else:
-            print(f"No case to parse: {l}", file=sys.stderr)
+            print(f"_parse_likes: No case to parse: {l}", file=sys.stderr)
             continue
         yield Like(
             liked_at=_parse_trakt_datetime(l["liked_at"]),
@@ -187,6 +196,24 @@ def _parse_show(d: Any) -> Show:
     return Show(**_parse_media(d))
 
 
+def _parse_season(d: Any, show_data: Any) -> Season:
+    return Season(
+        number=d["number"],
+        show=_parse_show(show_data),
+        ids=_parse_ids(d["ids"]),
+    )
+
+
+def _parse_episode(d: Any, show_data: Any) -> Episode:
+    return Episode(
+        title=d["title"],
+        season=d["season"],
+        episode=d["number"],
+        show=_parse_show(show_data),
+        ids=_parse_ids(d["ids"]),
+    )
+
+
 def _parse_watchlist(d: Any) -> Iterator[WatchListEntry]:
     for i in d:
         media_type = i["type"]
@@ -197,11 +224,35 @@ def _parse_watchlist(d: Any) -> Iterator[WatchListEntry]:
         elif media_type == "show":
             media_data = _parse_show(media_data_raw)
         else:
-            print(f"No case to parse: {i}", file=sys.stderr)
+            print(f"_parse_watchlist: No case to parse: {i}", file=sys.stderr)
             continue
         yield WatchListEntry(
             listed_at_id=i["id"],
             listed_at=_parse_trakt_datetime(i["listed_at"]),
+            media_type=media_type,
+            media_data=media_data,
+        )
+
+
+def _parse_ratings(d: Any) -> Iterator[Rating]:
+    for i in d:
+        media_type = i["type"]
+        media_data_raw = i[media_type]
+        media_data: Union[Movie, Show, Season, Episode]
+        if media_type == "movie":
+            media_data = _parse_movie(media_data_raw)
+        elif media_type == "show":
+            media_data = _parse_show(media_data_raw)
+        elif media_type == "season":
+            media_data = _parse_season(media_data_raw, i["show"])
+        elif media_type == "episode":
+            media_data = _parse_episode(media_data_raw, i["show"])
+        else:
+            print(f"_parse_ratings: No case to parse: {i}", file=sys.stderr)
+            continue
+        yield Rating(
+            rated_at=_parse_trakt_datetime(i["rated_at"]),
+            rating=i["rating"],
             media_type=media_type,
             media_data=media_data,
         )
@@ -214,7 +265,7 @@ def parse_export(p: Path) -> TraktExport:
     # going to only parse history for now, since its better structured for parsing
     # and seems to have more info
     #
-    # need to parse 'ratings', 'history'
+    # need to parse 'history'
 
     return TraktExport(
         username=data["username"],
@@ -224,4 +275,5 @@ def parse_export(p: Path) -> TraktExport:
         following=list(_parse_followers(data["followers"])),
         likes=list(_parse_likes(data["likes"])),
         watchlist=list(_parse_watchlist(data["watchlist"])),
+        ratings=list(_parse_ratings(data["ratings"])),
     )
