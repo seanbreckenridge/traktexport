@@ -10,7 +10,7 @@ import sys
 import json
 from pathlib import Path
 from datetime import datetime, timezone
-from typing import NamedTuple, List, Dict, Any, Optional, Iterator, Union
+from typing import NamedTuple, List, Dict, Any, Optional, Iterator, Union, Tuple
 from dataclasses import dataclass
 
 TRAKT_BASE = "https://trakt.tv/"
@@ -224,42 +224,46 @@ def _parse_episode(d: Any, show_data: Any) -> Episode:
     )
 
 
+def _parse_list_info(
+    d: Any,
+) -> Optional[Tuple[str, Union[Movie, Show, Season, Episode]]]:
+    media_type: str = d["type"]
+    media_data_raw = d["media_type"]
+    media_data: Union[Movie, Show, Season, Episode]
+    if media_type == "movie":
+        media_data = _parse_movie(media_data_raw)
+    elif media_type == "show":
+        media_data = _parse_show(media_data_raw)
+    elif media_type == "season":
+        media_data = _parse_season(media_data_raw, d["show"])
+    elif media_type == "episode":
+        media_data = _parse_episode(media_data_raw, d["show"])
+    else:
+        print(f"While parsing list, no case to parse: {d}", file=sys.stderr)
+        return None
+    return media_type, media_data
+
+
 def _parse_watchlist(d: Any) -> Iterator[WatchListEntry]:
     for i in d:
-        media_type = i["type"]
-        media_data_raw = i[media_type]
-        media_data: Union[Movie, Show]
-        if media_type == "movie":
-            media_data = _parse_movie(media_data_raw)
-        elif media_type == "show":
-            media_data = _parse_show(media_data_raw)
-        else:
-            print(f"_parse_watchlist: No case to parse: {i}", file=sys.stderr)
+        data = _parse_list_info(i)
+        if data is None:
             continue
+        media_type, media_data = data
         yield WatchListEntry(
             listed_at_id=i["id"],
             listed_at=_parse_trakt_datetime(i["listed_at"]),
             media_type=media_type,
-            media_data=media_data,
+            media_data=media_data,  # type: ignore[arg-type]
         )
 
 
 def _parse_ratings(d: Any) -> Iterator[Rating]:
     for i in d:
-        media_type = i["type"]
-        media_data_raw = i[media_type]
-        media_data: Union[Movie, Show, Season, Episode]
-        if media_type == "movie":
-            media_data = _parse_movie(media_data_raw)
-        elif media_type == "show":
-            media_data = _parse_show(media_data_raw)
-        elif media_type == "season":
-            media_data = _parse_season(media_data_raw, i["show"])
-        elif media_type == "episode":
-            media_data = _parse_episode(media_data_raw, i["show"])
-        else:
-            print(f"_parse_ratings: No case to parse: {i}", file=sys.stderr)
+        data = _parse_list_info(i)
+        if data is None:
             continue
+        media_type, media_data = data
         yield Rating(
             rated_at=_parse_trakt_datetime(i["rated_at"]),
             rating=i["rating"],
@@ -269,23 +273,17 @@ def _parse_ratings(d: Any) -> Iterator[Rating]:
 
 
 def _parse_history(d: Any) -> Iterator[HistoryEntry]:
-    for h in d:
-        media_type = h["type"]
-        media_data_raw = h[media_type]
-        media_data: Union[Movie, Episode]
-        if media_type == "movie":
-            media_data = _parse_movie(media_data_raw)
-        elif media_type == "episode":
-            media_data = _parse_episode(media_data_raw, h["show"])
-        else:
-            print(f"_parse_history: No case to parse: {h}", file=sys.stderr)
+    for i in d:
+        data = _parse_list_info(i)
+        if data is None:
             continue
+        media_type, media_data = data
         yield HistoryEntry(
-            history_id=h["id"],
-            watched_at=_parse_trakt_datetime(h["watched_at"]),
-            action=h["action"],
+            history_id=i["id"],
+            watched_at=_parse_trakt_datetime(i["watched_at"]),
+            action=i["action"],
             media_type=media_type,
-            media_data=media_data,
+            media_data=media_data,  # type: ignore[arg-type]
         )
 
 
@@ -295,8 +293,6 @@ def parse_export(p: Path) -> TraktExport:
     # is there any point in parsing 'watched', if we're also parsing 'history'?
     # going to only parse history for now, since its better structured for parsing
     # and seems to have more info
-    #
-    # need to parse 'history'
 
     return TraktExport(
         username=data["username"],

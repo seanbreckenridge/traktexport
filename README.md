@@ -14,7 +14,7 @@ To install with pip, run:
 
 ## Usage
 
-This uses OAuth to authenticate with the Trakt API, see [here](https://pytrakt.readthedocs.io/en/latest/getstarted.html#oauth-auth) for more info.
+This uses OAuth to authenticate with the Trakt API (which afaik requires you to be a [VIP](https://trakt.tv/vip) on Trakt), see [here](https://pytrakt.readthedocs.io/en/latest/getstarted.html#oauth-auth) for more info.
 
 This requires a manual setup the first time you use it, after which credentials are stored and this can run without any interaction.
 
@@ -66,7 +66,7 @@ In [3]: data.stats["movies"]["plays"]
 Out[3]: 1511
 ```
 
-Note: Doesn't currently parse:
+Note: This does include this info the export, but it doesn't currently parse:
 
 - collection
 - comments
