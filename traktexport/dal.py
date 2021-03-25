@@ -105,6 +105,15 @@ class Rating:
     media_data: Union[Movie, Show, Season, Episode]
 
 
+@dataclass
+class HistoryEntry:
+    history_id: int
+    watched_at: datetime
+    action: str
+    media_type: str
+    media_data: Union[Movie, Episode]
+
+
 class TraktExport(NamedTuple):
     username: str
     followers: List[Follow]
@@ -114,6 +123,7 @@ class TraktExport(NamedTuple):
     settings: Dict[str, Any]
     watchlist: List[WatchListEntry]
     ratings: List[Rating]
+    history: List[HistoryEntry]
 
 
 def _parse_trakt_datetime(ds: str) -> datetime:
@@ -258,6 +268,27 @@ def _parse_ratings(d: Any) -> Iterator[Rating]:
         )
 
 
+def _parse_history(d: Any) -> Iterator[HistoryEntry]:
+    for h in d:
+        media_type = h["type"]
+        media_data_raw = h[media_type]
+        media_data: Union[Movie, Episode]
+        if media_type == "movie":
+            media_data = _parse_movie(media_data_raw)
+        elif media_type == "episode":
+            media_data = _parse_episode(media_data_raw, h["show"])
+        else:
+            print(f"_parse_history: No case to parse: {h}", file=sys.stderr)
+            continue
+        yield HistoryEntry(
+            history_id=h["id"],
+            watched_at=_parse_trakt_datetime(h["watched_at"]),
+            action=h["action"],
+            media_type=media_type,
+            media_data=media_data,
+        )
+
+
 def parse_export(p: Path) -> TraktExport:
     data: Any = json.loads(p.read_text())
 
@@ -276,4 +307,5 @@ def parse_export(p: Path) -> TraktExport:
         likes=list(_parse_likes(data["likes"])),
         watchlist=list(_parse_watchlist(data["watchlist"])),
         ratings=list(_parse_ratings(data["ratings"])),
+        history=list(_parse_history(data["history"])),
     )
