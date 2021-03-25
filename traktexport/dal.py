@@ -59,12 +59,6 @@ class Episode(NamedTuple):
     show: Show
 
 
-class Rating(NamedTuple):
-    rated_at: datetime
-    rating: int
-    media_type: str
-
-
 class Comment(NamedTuple):
     comment_id: int
     text: str
@@ -87,6 +81,12 @@ class Like(NamedTuple):
     liked_at: datetime
     media_type: str
     media_data: Union[TraktList, Comment]
+
+
+class Rating(NamedTuple):
+    rated_at: datetime
+    rating: int
+    media_type: str
 
 
 class TraktExport(NamedTuple):

@@ -35,6 +35,5 @@ Then, to export all your ratings/movies/shows, run:
 
 The results are printed to STDOUT, so `> dump.json` saves it to `dump.json`
 
-### Parse
+### Inspect
 
-This repo also contains some code I use to parse the resulting export
