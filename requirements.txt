@@ -1,2 +1,4 @@
 click>=7.0
-trakt>=3.0.0
+trakt==3.0.0
+backoff
+logzero
