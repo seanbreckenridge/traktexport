@@ -131,10 +131,10 @@ def _parse_trakt_datetime(ds: str) -> datetime:
 
 
 def _parse_followers(d: Any) -> Iterator[Follow]:
-    for u in d:
+    for i in d:
         yield Follow(
-            followed_at=_parse_trakt_datetime(u["followed_at"]),
-            username=u["user"]["username"],
+            followed_at=_parse_trakt_datetime(i["followed_at"]),
+            username=i["user"]["username"],
         )
 
 
@@ -161,19 +161,19 @@ def _parse_trakt_list(d: Any) -> TraktList:
 
 
 def _parse_likes(d: Any) -> Iterator[Like]:
-    for l in d:
-        media_type = l["type"]
-        media_data_raw = l[media_type]
+    for i in d:
+        media_type = i["type"]
+        media_data_raw = i[media_type]
         media_data: Union[TraktList, Comment]
         if media_type == "comment":
             media_data = _parse_comment(media_data_raw)
         elif media_type == "list":
             media_data = _parse_trakt_list(media_data_raw)
         else:
-            print(f"_parse_likes: No case to parse: {l}", file=sys.stderr)
+            print(f"_parse_likes: No case to parse: {i}", file=sys.stderr)
             continue
         yield Like(
-            liked_at=_parse_trakt_datetime(l["liked_at"]),
+            liked_at=_parse_trakt_datetime(i["liked_at"]),
             media_type=media_type,
             media_data=media_data,
         )
@@ -224,11 +224,12 @@ def _parse_episode(d: Any, show_data: Any) -> Episode:
     )
 
 
+# extracts the common schema from ratings/history/watchlist
 def _parse_list_info(
     d: Any,
 ) -> Optional[Tuple[str, Union[Movie, Show, Season, Episode]]]:
     media_type: str = d["type"]
-    media_data_raw = d["media_type"]
+    media_data_raw = d[media_type]
     media_data: Union[Movie, Show, Season, Episode]
     if media_type == "movie":
         media_data = _parse_movie(media_data_raw)
@@ -299,7 +300,7 @@ def parse_export(p: Path) -> TraktExport:
         stats=data["stats"],
         settings=data["settings"],
         followers=list(_parse_followers(data["followers"])),
-        following=list(_parse_followers(data["followers"])),
+        following=list(_parse_followers(data["following"])),
         likes=list(_parse_likes(data["likes"])),
         watchlist=list(_parse_watchlist(data["watchlist"])),
         ratings=list(_parse_ratings(data["ratings"])),
