@@ -6,7 +6,7 @@ This isn't meant to be used to re-import info back into Trakt or export to anoth
 
 ## Installation
 
-Requires `python3.6+`
+Requires `python3.7+`
 
 To install with pip, run:
 

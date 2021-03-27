@@ -7,7 +7,7 @@ reqs = Path("requirements.txt").read_text().strip().splitlines()
 pkg = "traktexport"
 setup(
     name=pkg,
-    version="0.1.0",
+    version="0.1.1",
     url="https://github.com/seanbreckenridge/traktexport",
     author="Sean Breckenridge",
     author_email="seanbrecke@gmail.com",
@@ -24,7 +24,6 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
