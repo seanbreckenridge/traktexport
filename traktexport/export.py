@@ -1,5 +1,5 @@
 from time import sleep
-from typing import Dict, Any, Callable, Iterator, List
+from typing import Dict, Any, Iterator, List
 from urllib.parse import urljoin
 
 import backoff  # type: ignore[import]
@@ -51,7 +51,7 @@ def export(username: str) -> Dict[str, Any]:
         "username": username,
         "followers": _trakt_request(f"users/{username}/followers"),
         "following": _trakt_request(f"users/{username}/following"),
-        "settings": _trakt_request(f"users/settings"),
+        "settings": _trakt_request("users/settings"),
         "likes": _trakt_request("users/likes"),
         "profile": _trakt_request(f"users/{username}"),
         "comments": _trakt_request(f"users/{username}/comments"),

@@ -10,7 +10,7 @@ Requires `python3.6+`
 
 To install with pip, run:
 
-    pip install 'git+https://github.com/seanbreckenridge/traktexport'
+    pip install traktexport
 
 ## Usage
 
