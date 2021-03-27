@@ -1,6 +1,8 @@
 # traktexport
 
-Export your Movies, TV shows and ratings from [`Trakt.tv`](https://trakt.tv/)
+[![PyPi version](https://img.shields.io/pypi/v/traktexport.svg)](https://pypi.python.org/pypi/traktexport) [![Python 3.7|3.8|3.9](https://img.shields.io/pypi/pyversions/traktexport.svg)](https://pypi.python.org/pypi/traktexport) [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](http://makeapullrequest.com)
+
+Export your Movie/TV shows ratings and history from https://trakt.tv/
 
 This isn't meant to be used to re-import info back into Trakt or export to another site, its just meant to save all my data so I have it locally, and can do analysis or graph my history.
 
@@ -97,6 +99,6 @@ Note: This does include this info the export, but it doesn't currently parse:
 - lists
 - recommendations
 
-... because I don't have any of those on trakt
+... because I don't have any of those on trakt. If you use those, a PR would be appreciated!
 
 Created to use as part of [`HPI`](https://github.com/seanbreckenridge/HPI)
