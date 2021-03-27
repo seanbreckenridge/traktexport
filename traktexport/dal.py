@@ -304,6 +304,20 @@ def _parse_history(d: Any) -> Iterator[HistoryEntry]:
         )
 
 
+# a helper to parse items that are left as python primitives
+def _read_unparsed(p: Path, data: Optional[Any] = None) -> Dict[str, Any]:
+    ldata: Any
+    if data is None:
+        ldata = json.loads(p.read_text())
+    else:
+        ldata = data
+    return {
+        "username": ldata["username"],
+        "stats": ldata["stats"],
+        "settings": ldata["settings"],
+    }
+
+
 def parse_export(p: Path) -> TraktExport:
     data: Any = json.loads(p.read_text())
 
@@ -312,9 +326,7 @@ def parse_export(p: Path) -> TraktExport:
     # and seems to have more info
 
     return TraktExport(
-        username=data["username"],
-        stats=data["stats"],
-        settings=data["settings"],
+        **_read_unparsed(p, data),
         followers=list(_parse_followers(data["followers"])),
         following=list(_parse_followers(data["following"])),
         likes=list(_parse_likes(data["likes"])),
