@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from typing import NamedTuple, List, Dict, Any, Optional, Iterator, Union, Tuple
 from dataclasses import dataclass
 
-TRAKT_BASE = "https://trakt.tv/"
+TRAKT_BASE = "https://trakt.tv"
 
 
 # Note: I currently don't parse the following, because I don't have anything there
@@ -45,17 +45,29 @@ class Movie(NamedTuple):
     year: int
     ids: SiteIds
 
+    @property
+    def url(self) -> str:
+        return f"{TRAKT_BASE}/movies/{self.ids.trakt_slug}"
+
 
 class Show(NamedTuple):
     title: str
     year: int
     ids: SiteIds
 
+    @property
+    def url(self) -> str:
+        return f"{TRAKT_BASE}/shows/{self.ids.trakt_slug}"
+
 
 class Season(NamedTuple):
-    number: int
+    season: int
     ids: SiteIds
     show: Show
+
+    @property
+    def url(self) -> str:
+        return f"{TRAKT_BASE}/shows/{self.show.ids.trakt_slug}/seasons/{self.season}"
 
 
 class Episode(NamedTuple):
@@ -64,6 +76,10 @@ class Episode(NamedTuple):
     episode: int
     ids: SiteIds
     show: Show
+
+    @property
+    def url(self) -> str:
+        return f"{TRAKT_BASE}/shows/{self.show.ids.trakt_slug}/seasons/{self.season}/episodes/{self.episode}"
 
 
 class Comment(NamedTuple):
@@ -208,7 +224,7 @@ def _parse_show(d: Any) -> Show:
 
 def _parse_season(d: Any, show_data: Any) -> Season:
     return Season(
-        number=d["number"],
+        season=d["number"],
         show=_parse_show(show_data),
         ids=_parse_ids(d["ids"]),
     )
