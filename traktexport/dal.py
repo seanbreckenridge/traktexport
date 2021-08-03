@@ -8,9 +8,18 @@
 
 import sys
 import json
-from pathlib import Path
 from datetime import datetime, timezone
-from typing import NamedTuple, List, Dict, Any, Optional, Iterator, Union, Tuple
+from typing import (
+    NamedTuple,
+    List,
+    Dict,
+    Any,
+    Optional,
+    Iterator,
+    Union,
+    Tuple,
+    TextIO,
+)
 from dataclasses import dataclass
 
 TRAKT_BASE = "https://trakt.tv"
@@ -130,7 +139,11 @@ class HistoryEntry:
     media_data: Union[Movie, Episode]
 
 
-class TraktExport(NamedTuple):
+class PartialHistoryExport(NamedTuple):
+    history: List[HistoryEntry]
+
+
+class FullTraktExport(NamedTuple):
     username: str
     followers: List[Follow]
     following: List[Follow]
@@ -305,10 +318,10 @@ def _parse_history(d: Any) -> Iterator[HistoryEntry]:
 
 
 # a helper to parse items that are left as python primitives
-def _read_unparsed(p: Path, data: Optional[Any] = None) -> Dict[str, Any]:
+def _read_unparsed(f: TextIO, data: Optional[Any] = None) -> Dict[str, Any]:
     ldata: Any
     if data is None:
-        ldata = json.loads(p.read_text())
+        ldata = json.loads(f.read())
     else:
         ldata = data
     return {
@@ -318,19 +331,35 @@ def _read_unparsed(p: Path, data: Optional[Any] = None) -> Dict[str, Any]:
     }
 
 
-def parse_export(p: Path) -> TraktExport:
-    data: Any = json.loads(p.read_text())
+def _guess_export_type(data: Any) -> str:
+    if "type" in data:
+        return str(data["type"])
+    else:
+        if len(data.keys()) < 4:
+            return "partial"
+        else:
+            return "full"
+
+
+TraktExport = Union[FullTraktExport, PartialHistoryExport]
+
+
+def parse_export(f: TextIO) -> TraktExport:
+    data: Any = json.loads(f.read())
 
     # is there any point in parsing 'watched', if we're also parsing 'history'?
     # going to only parse history for now, since its better structured for parsing
     # and seems to have more info
 
-    return TraktExport(
-        **_read_unparsed(p, data),
-        followers=list(_parse_followers(data["followers"])),
-        following=list(_parse_followers(data["following"])),
-        likes=list(_parse_likes(data["likes"])),
-        watchlist=list(_parse_watchlist(data["watchlist"])),
-        ratings=list(_parse_ratings(data["ratings"])),
-        history=list(_parse_history(data["history"])),
-    )
+    if _guess_export_type(data) == "full":
+        return FullTraktExport(
+            **_read_unparsed(f, data),
+            followers=list(_parse_followers(data["followers"])),
+            following=list(_parse_followers(data["following"])),
+            likes=list(_parse_likes(data["likes"])),
+            watchlist=list(_parse_watchlist(data["watchlist"])),
+            ratings=list(_parse_ratings(data["ratings"])),
+            history=list(_parse_history(data["history"])),
+        )
+    else:
+        return PartialHistoryExport(history=list(_parse_history(data["history"])))

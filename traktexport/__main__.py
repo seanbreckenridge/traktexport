@@ -1,11 +1,12 @@
 import json
-from pathlib import Path
+from typing import Optional, Sequence
 
 import click
 from trakt import init  # type: ignore[import]
 
-from .export import export
-from .dal import parse_export
+from .export import full_export, partial_export
+from .dal import parse_export, TraktExport, FullTraktExport
+from .merge import read_and_merge_exports
 
 
 @click.group()
@@ -14,7 +15,7 @@ def main() -> None:
     pass
 
 
-@main.command()
+@main.command(short_help="setup authentication")
 @click.argument("USERNAME")
 def auth(username: str) -> None:
     """Authenticate (or Re-authenticate) - only needs to be done once"""
@@ -23,24 +24,61 @@ def auth(username: str) -> None:
     init(username, store=True)
 
 
-@main.command(name="export")
+@main.command(name="export", short_help="run an account export")
 @click.argument("USERNAME")
 def _export(username: str) -> None:
     """
-    Runs the export - assumes authentication has already been setup
+    Runs a full account export - assumes authentication has already been setup
 
     Prints results to STDOUT
     """
-    click.echo(json.dumps(export(username)))
+    click.echo(json.dumps(full_export(username)))
 
 
-@main.command(name="inspect")
+@main.command(name="partial_export", short_help="run a partial export")
+@click.argument("USERNAME")
+@click.option(
+    "--pages",
+    type=int,
+    default=None,
+    help="Only request these many pages of your history",
+)
+def _partial_export(username: str, pages: Optional[int]) -> None:
+    """
+    Run a partial history export - assumes authentication has already been setup
+
+    This exports your movie/TV show history from Trakt without all the other
+    attributes. You can specify --pages to only request the first few pages
+    so this doesn't take ages to run.
+
+    The 'merge' command takes multiple partial exports (or full exports)
+    and merges them all together into a complete history
+    """
+    click.echo(json.dumps(partial_export(username, pages=pages)))
+
+
+@main.command(name="inspect", short_help="read/interact with an export file")
 @click.argument("EXPORT_FILE", type=click.Path(exists=True))
 def _inspect(export_file: str) -> None:
     """
     Given an export JSON file, this parses the info into python objects
     """
-    data = parse_export(Path(export_file))
+    with open(export_file, "r") as f:
+        data: TraktExport = parse_export(f)  # either full or partial
+    click.secho("Use 'data' to interact with the parsed TraktExport object", fg="green")
+
+    import IPython  # type: ignore[import]
+
+    IPython.embed()
+
+
+@main.command(name="merge", short_help="merge multiple exports")
+@click.argument("EXPORT_FILES", type=click.Path(exists=True), nargs=-1, required=True)
+def _merge(export_files: Sequence[str]) -> None:
+    """
+    Given multiple JSON export files, this combines the data into a parsed object
+    """
+    data: FullTraktExport = read_and_merge_exports(list(export_files))
     click.secho("Use 'data' to interact with the parsed TraktExport object", fg="green")
 
     import IPython  # type: ignore[import]

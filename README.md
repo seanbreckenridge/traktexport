@@ -16,6 +16,24 @@ To install with pip, run:
 
 ## Usage
 
+```
+Usage: traktexport [OPTIONS] COMMAND [ARGS]...
+
+  Export data from your Trakt account
+
+Options:
+  --help  Show this message and exit.
+
+Commands:
+  auth            setup authentication
+  export          run an account export
+  inspect         read/interact with an export file
+  merge           merge multiple exports
+  partial_export  run a partial export
+```
+
+### Auth
+
 This uses OAuth to authenticate with the Trakt API (which afaik requires you to be a [VIP](https://trakt.tv/vip) on Trakt), see [here](https://pytrakt.readthedocs.io/en/latest/getstarted.html#oauth-auth) for more info.
 
 This requires a manual setup the first time you use it, after which credentials are stored and this can run without any interaction.
@@ -33,9 +51,9 @@ Once you've done that, this saves OAuth refresh info in `${XDG_DATA_HOME:-$HOME/
 
 Then, to export all your ratings/movies/shows, run:
 
-`traktexport export yourtraktusername > dump.json`
+`traktexport export yourtraktusername > data.json`
 
-The results are printed to STDOUT, so `> dump.json` saves it to `dump.json`
+The results are printed to STDOUT, so `> data.json` saves it to `data.json`
 
 ```
 $ python3 -m traktexport export yourTraktUsername > data.json
@@ -59,6 +77,38 @@ $ python3 -m traktexport export yourTraktUsername > data.json
 [D 210326 18:43:31 export:32] Requesting 'https://api-v2launch.trakt.tv/users/yourTraktUsername/history?limit=100&page=2'...
 [D 210326 18:43:34 export:44] First item: {'id': 7178301624, 'watched_at': '2021-01-23T04:25:15.000Z', 'action': 'watch', 'type': 'episode', 'episode': {'season': 7, 'number': 7, 'title': 'Dangerous Debt', 'ids': {'trakt': 2590748, 'tvdb': 7640571, 'imdb': 'tt9313956', 'tmdb': 2201892, 'tvrage': None}}, 'show': {'title': 'Star Wars: The Clone Wars', 'year': 2008, 'ids': {'trakt': 4170, 'slug': 'star-wars-the-clone-wars', 'tvdb': 83268, 'imdb': 'tt0458290', 'tmdb': 4194, 'tvrage': 19187}}}
 [D 210326 18:43:34 export:32] Requesting 'https://api-v2launch.trakt.tv/users/yourTraktUsername/history?limit=100&page=3'...
+```
+
+#### Partial Export
+
+You can also export a part of your recent history, instead of your entire history (as that tends to take a few minutes).
+
+```
+traktexport partial_export --help
+Usage: traktexport partial_export [OPTIONS] USERNAME
+
+  Run a partial history export - assumes authentication has already
+  been setup
+
+  This exports your movie/TV show history from Trakt without all
+  the other attributes. You can specify --pages to only request the
+  first few pages so this doesn't take ages to run.
+
+  The 'merge' command takes multiple partial exports (or full
+  exports) and merges them all together into a complete history
+
+Options:
+  --pages INTEGER  Only request these many pages of your history
+  --help           Show this message and exit.
+```
+
+Those can then all be combined by the `merge` command, like: `traktexport merge ~/data/trakt/*.json`
+
+To do this programatically in python, you can also do:
+
+```
+from traktexport.merge import read_and_merge_exports
+read_and_merge_exports(["full_export.json", "partial_export.json"])
 ```
 
 ### Inspect

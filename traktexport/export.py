@@ -1,5 +1,5 @@
 from time import sleep
-from typing import Dict, Any, Iterator, List
+from typing import Dict, Any, Iterator, List, Optional
 from urllib.parse import urljoin
 
 import backoff  # type: ignore[import]
@@ -35,7 +35,9 @@ def _trakt_request(endpoint: str, method: str = "get", data: Any = None) -> Any:
     return json_data
 
 
-def _trakt_paginate(endpoint_bare: str, limit: int = 100) -> Iterator[Any]:
+def _trakt_paginate(
+    endpoint_bare: str, limit: int = 100, request_pages: Optional[int] = None
+) -> Iterator[Any]:
     page = 1
     while True:
         items: List[Any] = _trakt_request(f"{endpoint_bare}?limit={limit}&page={page}")
@@ -44,10 +46,13 @@ def _trakt_paginate(endpoint_bare: str, limit: int = 100) -> Iterator[Any]:
         logger.debug(f"First item: {items[0]}")
         yield from items
         page += 1
+        if request_pages is not None and page > request_pages:
+            break
 
 
-def export(username: str) -> Dict[str, Any]:
+def full_export(username: str) -> Dict[str, Any]:
     return {
+        "type": "full",
         "username": username,
         "followers": _trakt_request(f"users/{username}/followers"),
         "following": _trakt_request(f"users/{username}/following"),
@@ -65,4 +70,13 @@ def export(username: str) -> Dict[str, Any]:
         + _trakt_request(f"users/{username}/collection/shows"),
         "stats": _trakt_request(f"users/{username}/stats"),
         "history": list(_trakt_paginate(f"users/{username}/history")),
+    }
+
+
+def partial_export(username: str, pages: Optional[int] = None) -> Dict[str, Any]:
+    return {
+        "type": "partial",
+        "history": list(
+            _trakt_paginate(f"users/{username}/history", request_pages=pages)
+        ),
     }
