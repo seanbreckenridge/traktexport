@@ -42,7 +42,7 @@ This requires a manual setup the first time you use it, after which credentials 
 
 - Go to https://trakt.tv/oauth/applications and create a new application
 - Use `urn:ietf:wg:oauth:2.0:oob` for the Redirect URI
-- Run `traktexport auth yourtraktusername`
+- Run `traktexport auth yourTraktUsername`
 - Follow the instructions, pasting in your Client ID/Secret from the Trakt dashboard, going to the link and pasting the generated pin back into the terminal
 
 Once you've done that, this saves OAuth refresh info in `${XDG_DATA_HOME:-$HOME/.local/share}/traktexport.json` (can overwrite location with the `TRAKTEXPORT_CFG` environment variable)
@@ -51,7 +51,7 @@ Once you've done that, this saves OAuth refresh info in `${XDG_DATA_HOME:-$HOME/
 
 Then, to export all your ratings/movies/shows, run:
 
-`traktexport export yourtraktusername > data.json`
+`traktexport export yourTraktUsername > data.json`
 
 The results are printed to STDOUT, so `> data.json` saves it to `data.json`
 
@@ -81,7 +81,7 @@ $ python3 -m traktexport export yourTraktUsername > data.json
 
 #### Partial Export
 
-You can also export a part of your recent history, instead of your entire history (as that tends to take a few minutes).
+You can also export a part of your recent history, instead of your entire history (as that tends to take a few minutes)
 
 ```
 traktexport partial_export --help
@@ -102,9 +102,11 @@ Options:
   --help           Show this message and exit.
 ```
 
+E.g. To export your most recent 100 watches, you can run `traktexport partial_export yourTraktUsername --pages 1`
+
 Those can then all be combined by the `merge` command, like: `traktexport merge ~/data/trakt/*.json`
 
-To do this programatically in python, you can also do:
+To do that in python, you can also do:
 
 ```
 from traktexport.merge import read_and_merge_exports

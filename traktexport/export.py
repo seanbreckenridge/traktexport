@@ -11,23 +11,22 @@ from logzero import logger  # type: ignore[import]
 # using any code from there, this fails to authenticate
 import trakt.users  # type: ignore
 
-# expononentailly backoff, but dont start at one second
-def expo_higher() -> Iterator[int]:
-    e = backoff.expo()
-    for _ in range(3):
-        next(e)
-    yield from e
 
-
-# This uses the bare CORE._handle_request instead of the wrapper
-# types so that I have access to more info
-#
-# the trakt module here is used for authentication, I just
-# create the URLs/save the entire response
-@backoff.on_exception(expo_higher, (RateLimitException,))
+@backoff.on_exception(backoff.expo, (RateLimitException,))
 def _trakt_request(endpoint: str, method: str = "get", data: Any = None) -> Any:
-    # endpoint: The URL to make a request to, doesn't include the domain
-    # method is lowercase because _handle_request expects it to be
+    """
+    Uses CORE._handle_request (configured trakt session handled by trakt)
+    to request information from Trakt
+
+    This uses the bare CORE._handle_request instead of the wrapper
+    types so that I have access to more info
+
+    the trakt module here is used for authentication, I just
+    create the URLs/save the entire response
+
+    endpoint: The URL to make a request to, doesn't include the domain
+    method is lowercase because _handle_request expects it to be
+    """
     url = urljoin(BASE_URL, endpoint)
     logger.debug(f"Requesting '{url}'...")
     json_data: Any = CORE._handle_request(method=method.lower(), url=url, data=data)
@@ -51,6 +50,7 @@ def _trakt_paginate(
 
 
 def full_export(username: str) -> Dict[str, Any]:
+    """Runs a full export for a trakt user"""
     return {
         "type": "full",
         "username": username,
@@ -74,6 +74,7 @@ def full_export(username: str) -> Dict[str, Any]:
 
 
 def partial_export(username: str, pages: Optional[int] = None) -> Dict[str, Any]:
+    """Runs a partial history export for a trakt user, i.e. grabs the first 'n' pages of history entries"""
     return {
         "type": "partial",
         "history": list(
