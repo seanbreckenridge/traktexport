@@ -156,7 +156,22 @@ class FullTraktExport(NamedTuple):
 
 
 def _parse_trakt_datetime(ds: str) -> datetime:
-    return datetime.astimezone(datetime.fromisoformat(ds.rstrip("Z")), tz=timezone.utc)
+    utc_naive = datetime.fromisoformat(ds.rstrip("Z"))
+    return datetime(
+        utc_naive.year,
+        utc_naive.month,
+        utc_naive.day,
+        utc_naive.hour,
+        utc_naive.minute,
+        utc_naive.second,
+        utc_naive.microsecond,
+        tzinfo=timezone.utc,
+    )
+
+
+def test_parse_utc_date() -> None:
+    expected = datetime(2021, 9, 30, 1, 44, 33, tzinfo=timezone.utc)
+    assert _parse_trakt_datetime("2021-09-30T01:44:33.000Z") == expected
 
 
 def _parse_followers(d: Any) -> Iterator[Follow]:
