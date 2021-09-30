@@ -7,7 +7,7 @@ reqs = Path("requirements.txt").read_text().strip().splitlines()
 pkg = "traktexport"
 setup(
     name=pkg,
-    version="0.1.2",
+    version="0.1.3",
     url="https://github.com/seanbreckenridge/traktexport",
     author="Sean Breckenridge",
     author_email="seanbrecke@gmail.com",
