@@ -17,6 +17,7 @@ setup(
     license="MIT",
     packages=find_packages(include=[pkg]),
     install_requires=reqs,
+    python_requires=">=3.7",
     package_data={pkg: ["py.typed"]},
     keywords="media movies export data",
     entry_points={"console_scripts": ["traktexport = traktexport.__main__:main"]},
