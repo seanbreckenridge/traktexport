@@ -4,7 +4,7 @@
 
 Export your Movie/TV shows ratings and history from https://trakt.tv/
 
-This isn't meant to be used to re-import info back into Trakt or export to another site, its just meant to save all my data so I have it locally, and can do analysis or graph my history.
+This isn't meant to be used to re-import info back into Trakt or export to another site, its just meant to save all my data so I have it locally, and can do analysis or graph my history (e.g., on [my feed](https://sean.fish/feed/?order_by=when&sort=desc&ftype=trakt_history_episode%2Ctrakt_history_movie))
 
 ## Installation
 
