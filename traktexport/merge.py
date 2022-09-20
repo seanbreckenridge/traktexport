@@ -52,8 +52,7 @@ def merge_exports(unsorted: List[TraktExport]) -> FullTraktExport:
     # sort exports by history count (full exports will have more
     # history entries) so that the latest stats are preserved
     full_exports.sort(key=lambda e: len(e.history))
-    latest_full_export = full_exports[-1]
-    trakt_dict = latest_full_export._asdict()
+    trakt_dict = full_exports[-1]._asdict()
 
     hist = list(_merge_history_entries(unsorted))
     hist.sort(key=lambda h: h.watched_at, reverse=True)  # ordered to most recent first
