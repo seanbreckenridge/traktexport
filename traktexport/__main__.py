@@ -1,12 +1,25 @@
+import sys
 import json
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Generator
+from contextlib import contextmanager
 
 import click
 from trakt import init  # type: ignore[import]
+from trakt.errors import TraktUnavailable  # type: ignore[import]
 
 from .export import full_export, partial_export
 from .dal import parse_export, TraktExport, FullTraktExport
 from .merge import read_and_merge_exports
+
+
+# if trakt unavailable, exit with code 3
+@contextmanager
+def handle_trakt_unavailable() -> Generator[None, None, None]:
+    try:
+        yield
+    except TraktUnavailable as e:
+        print(f"Error: {e}")
+        sys.exit(3)
 
 
 @click.group()
@@ -32,7 +45,8 @@ def _export(username: str) -> None:
 
     Prints results to STDOUT
     """
-    click.echo(json.dumps(full_export(username)))
+    with handle_trakt_unavailable():
+        click.echo(json.dumps(full_export(username)))
 
 
 @main.command(name="partial_export", short_help="run a partial export")
@@ -54,7 +68,8 @@ def _partial_export(username: str, pages: Optional[int]) -> None:
     The 'merge' command takes multiple partial exports (or full exports)
     and merges them all together into a complete history
     """
-    click.echo(json.dumps(partial_export(username, pages=pages)))
+    with handle_trakt_unavailable():
+        click.echo(json.dumps(partial_export(username, pages=pages)))
 
 
 @main.command(name="inspect", short_help="read/interact with an export file")

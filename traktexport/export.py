@@ -10,6 +10,7 @@ from logzero import logger  # type: ignore[import]
 # for some reason, if I dont import this, even if I'm not
 # using any code from there, this fails to authenticate
 import trakt.users  # type: ignore
+from trakt.errors import TraktUnavailable
 
 
 @backoff.on_exception(backoff.expo, (RateLimitException,))
