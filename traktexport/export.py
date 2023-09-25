@@ -9,8 +9,8 @@ from logzero import logger  # type: ignore[import]
 
 # for some reason, if I dont import this, even if I'm not
 # using any code from there, this fails to authenticate
-import trakt.users  # type: ignore
-from trakt.errors import TraktUnavailable
+import trakt.users  # type: ignore # noqa: F401
+from trakt.errors import TraktUnavailable  # noqa: F401
 
 
 @backoff.on_exception(backoff.expo, (RateLimitException,))

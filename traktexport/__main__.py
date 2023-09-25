@@ -79,7 +79,7 @@ def _inspect(export_file: str) -> None:
     Given an export JSON file, this parses the info into python objects
     """
     with open(export_file, "r") as f:
-        data: TraktExport = parse_export(f)  # either full or partial
+        data: TraktExport = parse_export(f)  # noqa
     click.secho("Use 'data' to interact with the parsed TraktExport object", fg="green")
 
     import IPython  # type: ignore[import]
@@ -93,7 +93,7 @@ def _merge(export_files: Sequence[str]) -> None:
     """
     Given multiple JSON export files, this combines the data into a parsed object
     """
-    data: FullTraktExport = read_and_merge_exports(list(export_files))
+    data: FullTraktExport = read_and_merge_exports(list(export_files))  # noqa
     click.secho("Use 'data' to interact with the parsed TraktExport object", fg="green")
 
     import IPython  # type: ignore[import]
