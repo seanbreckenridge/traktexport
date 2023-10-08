@@ -1,6 +1,6 @@
 # traktexport
 
-[![PyPi version](https://img.shields.io/pypi/v/traktexport.svg)](https://pypi.python.org/pypi/traktexport) [![Python 3.7|3.8|3.9](https://img.shields.io/pypi/pyversions/traktexport.svg)](https://pypi.python.org/pypi/traktexport) [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](http://makeapullrequest.com)
+[![PyPi version](https://img.shields.io/pypi/v/traktexport.svg)](https://pypi.python.org/pypi/traktexport) [![Python 3.8|3.9|3.10|3.11](https://img.shields.io/pypi/pyversions/traktexport.svg)](https://pypi.python.org/pypi/traktexport) [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](http://makeapullrequest.com)
 
 Export your Movie/TV shows ratings and history from https://trakt.tv/
 
@@ -8,7 +8,7 @@ This isn't meant to be used to re-import info back into Trakt or export to anoth
 
 ## Installation
 
-Requires `python3.7+`
+Requires `python3.8+`
 
 To install with pip, run:
 
