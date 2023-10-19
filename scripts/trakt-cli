@@ -10,6 +10,8 @@ this is very unstable, it is super basic right now
 # - command to change rating on movie/show
 # - watch should ask if you want to set a rating if its a movie
 # - allow localizing datetimes for recent
+# - allow setting a different watch time for watch
+# - allow watch to search instead of just using the url
 
 from typing import Optional, NamedTuple, Union, Iterator, Iterable
 
