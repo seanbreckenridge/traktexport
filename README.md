@@ -34,13 +34,13 @@ Commands:
 
 ### Auth
 
-This uses OAuth to authenticate with the Trakt API (which afaik requires you to be a [VIP](https://trakt.tv/vip) on Trakt), see [here](https://pytrakt.readthedocs.io/en/latest/getstarted.html#oauth-auth) for more info.
+This uses OAuth to authenticate with the Trakt API, see [here](https://glensc.github.io/python-pytrakt/getstarted.html#oauth-auth) for more info.
 
 This requires a manual setup the first time you use it, after which credentials are stored and this can run without any interaction.
 
 ### Setup
 
-- Go to https://trakt.tv/oauth/applications and create a new application
+- Go to <https://trakt.tv/oauth/applications> and create a new application
 - Use `urn:ietf:wg:oauth:2.0:oob` for the Redirect URI
 - Run `traktexport auth yourTraktUsername`
 - Follow the instructions, pasting in your Client ID/Secret from the Trakt dashboard, going to the link and pasting the generated pin back into the terminal

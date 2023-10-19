@@ -29,12 +29,29 @@ def main() -> None:
 
 
 @main.command(short_help="setup authentication")
+@click.option(
+    "--client-id",
+    envvar="TRAKT_CLIENT_ID",
+    required=True,
+    help="Trakt Client ID",
+    prompt=True,
+    show_envvar=True,
+)
+@click.option(
+    "--client-secret",
+    envvar="TRAKT_CLIENT_SECRET",
+    required=True,
+    help="Trakt Client Secret",
+    prompt=True,
+    show_envvar=True,
+    hide_input=True,
+)
 @click.argument("USERNAME")
-def auth(username: str) -> None:
+def auth(client_id: str, client_secret: str, username: str) -> None:
     """Authenticate (or Re-authenticate) - only needs to be done once"""
     # https://pytrakt.readthedocs.io/en/latest/getstarted.html#oauth-auth
     # use OAuth and store credentials
-    init(username, store=True)
+    init(username, store=True, client_id=client_id, client_secret=client_secret)
 
 
 @main.command(name="export", short_help="run an account export")

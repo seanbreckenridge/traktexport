@@ -1,5 +1,7 @@
+import os
 from time import sleep
 from typing import Dict, Any, Iterator, List, Optional
+from functools import lru_cache
 from urllib.parse import urljoin
 
 import backoff  # type: ignore[import]
@@ -7,14 +9,24 @@ from trakt.core import CORE, BASE_URL  # type: ignore[import]
 from trakt.errors import RateLimitException  # type: ignore[import]
 from logzero import logger  # type: ignore[import]
 
-# for some reason, if I dont import this, even if I'm not
-# using any code from there, this fails to authenticate
-import trakt.users  # type: ignore # noqa: F401
-from trakt.errors import TraktUnavailable  # noqa: F401
+
+@lru_cache(maxsize=1)
+def _check_config() -> None:
+    from . import traktexport_cfg
+
+    if not os.path.exists(traktexport_cfg):
+        raise FileNotFoundError(
+            f"Config file '{traktexport_cfg}' not found. Run 'traktexport auth' to create it."
+        )
+
+    import trakt.core as core_module  # type: ignore[import]
+
+    if not core_module.CLIENT_ID or not core_module.CLIENT_SECRET:
+        core_module.load_config()
 
 
 @backoff.on_exception(backoff.expo, (RateLimitException,))
-def _trakt_request(endpoint: str, method: str = "get", data: Any = None) -> Any:
+def _trakt_request(endpoint: str, data: Any = None) -> Any:
     """
     Uses CORE._handle_request (configured trakt session handled by trakt)
     to request information from Trakt
@@ -28,9 +40,10 @@ def _trakt_request(endpoint: str, method: str = "get", data: Any = None) -> Any:
     endpoint: The URL to make a request to, doesn't include the domain
     method is lowercase because _handle_request expects it to be
     """
+    _check_config()
     url = urljoin(BASE_URL, endpoint)
     logger.debug(f"Requesting '{url}'...")
-    json_data: Any = CORE._handle_request(method=method.lower(), url=url, data=data)
+    json_data = CORE._handle_request("get", url)
     sleep(2)
     return json_data
 
