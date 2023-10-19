@@ -19,10 +19,8 @@ def _check_config() -> None:
             f"Config file '{traktexport_cfg}' not found. Run 'traktexport auth' to create it."
         )
 
-    import trakt.core as core_module  # type: ignore[import]
-
-    if not core_module.CLIENT_ID or not core_module.CLIENT_SECRET:
-        core_module.load_config()
+    # loads config and refreshes token if needed
+    CORE._bootstrap()
 
 
 SLEEP_TIME = int(os.environ.get("TRAKTEXPORT_SLEEP_TIME", 2))
