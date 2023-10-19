@@ -8,10 +8,9 @@ this is very unstable, it is super basic right now
 
 # TODO:
 # - command to change rating on movie/show
-# - unwatch should let you select/confirm
 # - watch should ask if you want to set a rating if its a movie
 
-from typing import Optional, NamedTuple, Union
+from typing import Optional, NamedTuple, Union, Iterator, Iterable
 
 import click
 from logzero import logger
@@ -23,7 +22,14 @@ USERNAME: Optional[str] = None
 
 
 @click.group()
-@click.option("-u", "--username", help="Trakt username", required=True)
+@click.option(
+    "-u",
+    "--username",
+    help="Trakt username",
+    required=True,
+    envvar="TRAKT_USERNAME",
+    show_envvar=True,
+)
 def main(username: str) -> None:
     global USERNAME
 
@@ -78,6 +84,8 @@ def _mark_watched(inp: Input) -> None:
     else:
         raise ValueError("Invalid input")
 
+    assert USERNAME is not None
+
 
 @main.command()
 @click.option("--url", help="URL to watch", required=True)
@@ -85,26 +93,93 @@ def watch(url: str) -> None:
     """
     Pass the movie/episode url to mark it as watched right now
     """
+    assert USERNAME is not None
     inp = _parse_url_to_input(url)
     _mark_watched(inp)
+    _print_recent_history(_recent_history_entries(username=USERNAME, limit=10))
+
+
+from traktexport.dal import _parse_history, HistoryEntry
+
+
+def _recent_history_entries(
+    *, username: str, limit: int = 10, page: int = 1
+) -> Iterator[HistoryEntry]:
+    from traktexport.export import _trakt_request
+
+    data = _trakt_request(
+        f"users/{username}/history?page={page}&limit={limit}", logger=None, sleep_time=0
+    )
+
+    yield from _parse_history(data)
+
+
+#     @dataclass
+# class HistoryEntry:
+#     history_id: int
+#     watched_at: datetime
+#     action: str
+#     media_type: str
+#     media_data: Union[Movie, Episode]
+
+
+def _display_history_entry(entry: HistoryEntry, include_id: bool = False) -> str:
+    from datetime import datetime
+    from traktexport.dal import Movie, Episode
+
+    watched_at = entry.watched_at.strftime("%Y-%m-%d %H:%M:%S")
+    s: str
+    if isinstance(entry.media_data, Movie):
+        s = f"{watched_at} {entry.action} {entry.media_data.title}"
+    elif isinstance(entry.media_data, Episode):
+        ep = entry.media_data
+        assert isinstance(ep, Episode)
+        s = f"{watched_at} {ep.show.title} S{ep.season}E{ep.episode} - {ep.title}"
+    else:
+        raise ValueError(f"Invalid media_type: {entry.media_type}")
+
+    if include_id:
+        s += f" ({entry.history_id})"
+    return s
+
+
+def _print_recent_history(
+    history: Iterable[HistoryEntry], include_id: bool = False
+) -> None:
+    history = list(history)  # consume so the request happens
+    click.secho("Recent history:\n", bold=True)
+    for i, entry in enumerate(history, 1):
+        click.echo(f"{i}: {_display_history_entry(entry, include_id=include_id)}")
 
 
 @main.command()
-def unwatch() -> None:
+@click.option("-i/-a", "--interactive/--non-interactive", default=True, is_flag=True)
+def unwatch(interactive: bool) -> None:
     """
     Remove the last watched item from your history
     """
-    from trakt.users import User
     from traktexport.export import _trakt_request
 
-    u = User(USERNAME)
-    u._get()
+    assert USERNAME is not None
+    data = list(_recent_history_entries(username=USERNAME, limit=10))
+    picked: HistoryEntry = data[0]
+    if interactive:
+        _print_recent_history(data, include_id=True)
+        picked_int: int = click.prompt(
+            "Pick item (number) to remove",
+            type=int,
+            default=1,
+        )
+        if picked_int < 1 or picked_int > len(data):
+            raise click.ClickException("Invalid choice")
 
-    data = _trakt_request(f"users/{USERNAME}/history", logger=None)
-    last = data[0]
-    last_history_id = last["id"]
+        picked = data[picked_int - 1]
 
-    click.echo(last)
+    click.echo(f"Removing {picked}...")
+
+    last_history_id = picked.history_id
+    click.confirm(f"Remove {picked}?", abort=True, default=True)
+
     click.echo(f"Removing {last_history_id}...")
 
     resp = _trakt_request(
@@ -112,9 +187,22 @@ def unwatch() -> None:
         method="post",
         data={"movies": [], "episodes": [], "ids": [last_history_id]},
         logger=logger,
+        sleep_time=0,
     )
 
-    print(resp)
+    click.echo(resp)
+    _print_recent_history(
+        _recent_history_entries(username=USERNAME, limit=10), include_id=True
+    )
+
+
+@main.command()
+def recent() -> None:
+    """
+    Show recent history
+    """
+    assert USERNAME is not None
+    _print_recent_history(_recent_history_entries(username=USERNAME, limit=10))
 
 
 if __name__ == "__main__":

@@ -32,6 +32,7 @@ def _trakt_request(
     endpoint: str,
     data: Any = None,
     *,
+    sleep_time: int = SLEEP_TIME,
     logger: Optional[logging.Logger] = None,
     method: Literal["get", "post", "patch"] = "get",
 ) -> Any:
@@ -53,7 +54,8 @@ def _trakt_request(
     if logger:
         logger.debug(f"Requesting '{url}'...")
     json_data = CORE._handle_request(method=method, url=url, data=data)
-    sleep(SLEEP_TIME)
+    if sleep_time:
+        sleep(sleep_time)
     return json_data
 
 
@@ -111,6 +113,8 @@ def partial_export(username: str, pages: Optional[int] = None) -> Dict[str, Any]
     return {
         "type": "partial",
         "history": list(
-            _trakt_paginate(f"users/{username}/history", request_pages=pages)
+            _trakt_paginate(
+                f"users/{username}/history", request_pages=pages, logger=logger
+            )
         ),
     }
