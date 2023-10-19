@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+
+"""
+A CLI script to add/remove items from history using the trakt url
+
+this is very unstable, it is super basic right now
+"""
+
+# TODO:
+# - command to change rating on movie/show
+# - unwatch should let you select/confirm
+# - watch should ask if you want to set a rating if its a movie
+
+from typing import Optional, NamedTuple, Union
+
+import click
+from logzero import logger
+from traktexport.export import _check_config
+
+_check_config()
+
+USERNAME: Optional[str] = None
+
+
+@click.group()
+@click.option("-u", "--username", help="Trakt username", required=True)
+def main(username: str) -> None:
+    global USERNAME
+
+    USERNAME = username
+
+
+class Movie(NamedTuple):
+    id: str
+
+
+class Episode(NamedTuple):
+    id: str
+    season: int
+    episode: int
+
+
+Input = Union[Movie, Episode]
+
+
+def _parse_url_to_input(url: str) -> Input:
+    from urllib.parse import urlsplit
+
+    parts = urlsplit(url)
+    if parts.netloc != "trakt.tv":
+        raise ValueError(f"Invalid URL netloc: {parts.netloc}")
+
+    parts = [u for u in parts.path.split("/") if u.strip()]
+
+    match parts:
+        case ["movies", id, *_]:
+            return Movie(id)
+        case ["shows", id, "seasons", season, "episodes", episode, *_]:
+            return Episode(id, int(season), int(episode))
+        case _:
+            raise ValueError(f"Invalid URL parts: {parts}")
+
+
+def _mark_watched(inp: Input) -> None:
+    from trakt.movies import Movie
+    from trakt.tv import TVEpisode
+
+    if isinstance(inp, Movie):
+        mv = Movie(inp.id, year=None, slug=inp.id)
+        mv._get()
+        resp = mv.mark_as_seen()
+        click.echo(resp)
+    elif isinstance(inp, Episode):
+        ep = TVEpisode(inp.id, inp.season, inp.episode)
+        ep._get()
+        resp = ep.mark_as_seen()
+        click.echo(resp)
+    else:
+        raise ValueError("Invalid input")
+
+
+@main.command()
+@click.option("--url", help="URL to watch", required=True)
+def watch(url: str) -> None:
+    """
+    Pass the movie/episode url to mark it as watched right now
+    """
+    inp = _parse_url_to_input(url)
+    _mark_watched(inp)
+
+
+@main.command()
+def unwatch() -> None:
+    """
+    Remove the last watched item from your history
+    """
+    from trakt.users import User
+    from traktexport.export import _trakt_request
+
+    u = User(USERNAME)
+    u._get()
+
+    data = _trakt_request(f"users/{USERNAME}/history", logger=None)
+    last = data[0]
+    last_history_id = last["id"]
+
+    click.echo(last)
+    click.echo(f"Removing {last_history_id}...")
+
+    resp = _trakt_request(
+        "sync/history/remove",
+        method="post",
+        data={"movies": [], "episodes": [], "ids": [last_history_id]},
+        logger=logger,
+    )
+
+    print(resp)
+
+
+if __name__ == "__main__":
+    main()
