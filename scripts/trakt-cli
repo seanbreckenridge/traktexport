@@ -85,8 +85,6 @@ def _mark_watched(inp: Input) -> None:
     else:
         raise ValueError("Invalid input")
 
-    assert USERNAME is not None
-
 
 @main.command(short_help="mark movie/episode as watched")
 @click.option("--url", help="URL to watch", required=True)
