@@ -25,6 +25,9 @@ def _check_config() -> None:
         core_module.load_config()
 
 
+SLEEP_TIME = int(os.environ.get("TRAKTEXPORT_SLEEP_TIME", 2))
+
+
 @backoff.on_exception(backoff.expo, (RateLimitException,))
 def _trakt_request(endpoint: str, data: Any = None) -> Any:
     """
@@ -43,8 +46,8 @@ def _trakt_request(endpoint: str, data: Any = None) -> Any:
     _check_config()
     url = urljoin(BASE_URL, endpoint)
     logger.debug(f"Requesting '{url}'...")
-    json_data = CORE._handle_request("get", url)
-    sleep(2)
+    json_data = CORE._handle_request(method="get", url=url, data=data)
+    sleep(SLEEP_TIME)
     return json_data
 
 
