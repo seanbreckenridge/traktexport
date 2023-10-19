@@ -9,11 +9,12 @@ this is very unstable, it is super basic right now
 # TODO:
 # - command to change rating on movie/show
 # - watch should ask if you want to set a rating if its a movie
+# - allow localizing datetimes for recent
 
 from typing import Optional, NamedTuple, Union, Iterator, Iterable
 
 import click
-from logzero import logger
+from logzero import logger  # type: ignore[import]
 from traktexport.export import _check_config
 
 _check_config()
@@ -56,20 +57,20 @@ def _parse_url_to_input(url: str) -> Input:
     if parts.netloc != "trakt.tv":
         raise ValueError(f"Invalid URL netloc: {parts.netloc}")
 
-    parts = [u for u in parts.path.split("/") if u.strip()]
+    prts = [u for u in parts.path.split("/") if u.strip()]
 
-    match parts:
+    match prts:
         case ["movies", id, *_]:
             return Movie(id)
         case ["shows", id, "seasons", season, "episodes", episode, *_]:
             return Episode(id, int(season), int(episode))
         case _:
-            raise ValueError(f"Invalid URL parts: {parts}")
+            raise ValueError(f"Invalid URL parts: {prts}")
 
 
 def _mark_watched(inp: Input) -> None:
-    from trakt.movies import Movie
-    from trakt.tv import TVEpisode
+    from trakt.movies import Movie  # type: ignore[import]
+    from trakt.tv import TVEpisode  # type: ignore[import]
 
     if isinstance(inp, Movie):
         mv = Movie(inp.id, year=None, slug=inp.id)
@@ -87,7 +88,7 @@ def _mark_watched(inp: Input) -> None:
     assert USERNAME is not None
 
 
-@main.command()
+@main.command(short_help="mark movie/episode as watched")
 @click.option("--url", help="URL to watch", required=True)
 def watch(url: str) -> None:
     """
@@ -114,17 +115,7 @@ def _recent_history_entries(
     yield from _parse_history(data)
 
 
-#     @dataclass
-# class HistoryEntry:
-#     history_id: int
-#     watched_at: datetime
-#     action: str
-#     media_type: str
-#     media_data: Union[Movie, Episode]
-
-
 def _display_history_entry(entry: HistoryEntry, include_id: bool = False) -> str:
-    from datetime import datetime
     from traktexport.dal import Movie, Episode
 
     watched_at = entry.watched_at.strftime("%Y-%m-%d %H:%M:%S")
@@ -152,7 +143,7 @@ def _print_recent_history(
         click.echo(f"{i}: {_display_history_entry(entry, include_id=include_id)}")
 
 
-@main.command()
+@main.command(short_help="remove recent watched item")
 @click.option("-i/-a", "--interactive/--non-interactive", default=True, is_flag=True)
 def unwatch(interactive: bool) -> None:
     """
@@ -196,7 +187,7 @@ def unwatch(interactive: bool) -> None:
     )
 
 
-@main.command()
+@main.command(short_help="show recent history")
 def recent() -> None:
     """
     Show recent history

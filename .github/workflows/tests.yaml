@@ -28,7 +28,7 @@ jobs:
           pytest ./traktexport/*.py
       - name: Run mypy
         run: |
-          mypy ./traktexport
+          mypy ./traktexport ./scripts/trakt-cli
       - name: Run flake8
         run: |
-          flake8 ./traktexport
+          flake8 ./traktexport ./scripts/trakt-cli
