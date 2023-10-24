@@ -7,17 +7,25 @@ this is very unstable, it is super basic right now
 """
 
 # TODO:
-# - command to change rating on movie/show
-# - watch should ask if you want to set a rating if its a movie
-# - allow localizing datetimes for recent
-# - allow setting a different watch time for watch
 # - allow watch to search instead of just using the url
 
-from typing import Optional, NamedTuple, Union, Iterator, Iterable
+import json
+from typing import (
+    Optional,
+    NamedTuple,
+    Union,
+    Iterator,
+    Iterable,
+    Any,
+)
+from datetime import datetime, timezone
 
 import click
 from logzero import logger  # type: ignore[import]
 from traktexport.export import _check_config
+
+from trakt.movies import Movie  # type: ignore[import]
+from trakt.tv import TVShow, TVEpisode  # type: ignore[import]
 
 _check_config()
 
@@ -39,17 +47,49 @@ def main(username: str) -> None:
     USERNAME = username
 
 
-class Movie(NamedTuple):
+class MovieId(NamedTuple):
     id: str
 
+    def trakt(self) -> Movie:
+        from trakt.movies import Movie
 
-class Episode(NamedTuple):
+        mv = Movie(self.id, year=None, slug=self.id)
+        mv._get()
+        return mv
+
+
+class EpisodeId(NamedTuple):
     id: str
     season: int
     episode: int
 
+    def trakt(self) -> TVEpisode:
+        from trakt.tv import TVEpisode
 
-Input = Union[Movie, Episode]
+        ep = TVEpisode(show=self.id, season=self.season, number=self.episode)
+        ep._get()
+        return ep
+
+
+class TVShowId(NamedTuple):
+    id: str
+
+    def trakt(self) -> TVShow:
+        from trakt.tv import TVShow
+
+        tv = TVShow(self.id)
+        tv._get()
+        return tv
+
+
+Input = Union[MovieId, EpisodeId, TVShowId]
+
+
+def _print_response(d: Any) -> None:
+    if isinstance(d, dict):
+        click.echo(json.dumps(d, indent=2), err=True)
+    else:
+        click.echo(d, err=True)
 
 
 def _parse_url_to_input(url: str) -> Input:
@@ -57,56 +97,87 @@ def _parse_url_to_input(url: str) -> Input:
 
     parts = urlsplit(url)
     if parts.netloc != "trakt.tv":
-        raise ValueError(f"Invalid URL netloc: {parts.netloc}")
+        raise ValueError(f"Invalid URL netloc: {parts.netloc}, expected trakt.tv")
 
-    prts = [u for u in parts.path.split("/") if u.strip()]
+    prts = [u.strip() for u in parts.path.split("/") if u.strip()]
 
     match prts:
         case ["movies", id, *_]:
-            return Movie(id)
+            return MovieId(id)
         case ["shows", id, "seasons", season, "episodes", episode, *_]:
-            return Episode(id, int(season), int(episode))
+            return EpisodeId(id, int(season), int(episode))
+        case ["shows", id, *_]:
+            return TVShowId(id)
         case _:
             raise ValueError(f"Invalid URL parts: {prts}")
 
 
-def _mark_watched(inp: Input) -> None:
-    from trakt.movies import Movie  # type: ignore[import]
-    from trakt.tv import TVEpisode  # type: ignore[import]
-
-    if isinstance(inp, Movie):
-        mv = Movie(inp.id, year=None, slug=inp.id)
-        mv._get()
-        resp = mv.mark_as_seen()
-        click.echo(resp)
-    elif isinstance(inp, Episode):
-        ep = TVEpisode(inp.id, inp.season, inp.episode)
-        ep._get()
-        resp = ep.mark_as_seen()
-        click.echo(resp)
+def _mark_watched(input: Input, watched_at: Optional[datetime] = None) -> None:
+    if isinstance(input, MovieId):
+        mv = input.trakt()
+        _print_response(mv.mark_as_seen(watched_at=watched_at))
+        if click.confirm("Set rating?", default=True):
+            rating = click.prompt("Rating", type=int)
+            _print_response(mv.rate(rating))
+    elif isinstance(input, EpisodeId):
+        ep = input.trakt()
+        _print_response(ep.mark_as_seen(watched_at=watched_at))
+    elif isinstance(input, TVShowId):
+        raise NotImplementedError(
+            "TVShow not implemented, this would probably mean watch an entire show?"
+        )
     else:
-        raise ValueError("Invalid input")
+        raise ValueError(f"Invalid input type: {type(input)}")
+
+
+def _parse_datetime(
+    ctx: click.Context, param: click.Argument, value: str
+) -> Optional[datetime]:
+    import dateparser
+    import warnings
+
+    # remove pytz warning from dateparser module
+    warnings.filterwarnings("ignore", "The localize method is no longer necessary")
+
+    if value is None:
+        return None
+
+    ds = value.strip()
+    dt = dateparser.parse(ds)
+    if dt is None:
+        raise click.BadParameter(f"Could not parse '{ds}' into a date")
+    else:
+        ts = dt.timestamp()
+        local_dt = datetime.fromtimestamp(ts)
+        click.echo(f"Date: {local_dt}", err=True)
+        return datetime.fromtimestamp(ts, tz=timezone.utc)
 
 
 @main.command(short_help="mark movie/episode as watched")
-@click.option("--url", help="URL to watch", required=True)
-def watch(url: str) -> None:
+@click.option("--url", help="URL to watch", required=True, prompt=True)
+@click.option(
+    "-a", "--at", help="Watched at time", callback=_parse_datetime, default=None
+)
+def watch(url: str, at: Optional[datetime]) -> None:
     """
     Pass the movie/episode url to mark it as watched right now
     """
     assert USERNAME is not None
-    inp = _parse_url_to_input(url)
-    _mark_watched(inp)
-    _print_recent_history(_recent_history_entries(username=USERNAME, limit=10))
+    input = _parse_url_to_input(url)
+    _mark_watched(input, at)
+    _print_recent_history(_recent_history_entries(limit=10))
 
 
 from traktexport.dal import _parse_history, HistoryEntry
 
 
 def _recent_history_entries(
-    *, username: str, limit: int = 10, page: int = 1
+    *, limit: int = 10, page: int = 1
 ) -> Iterator[HistoryEntry]:
     from traktexport.export import _trakt_request
+
+    username = USERNAME
+    assert username is not None
 
     data = _trakt_request(
         f"users/{username}/history?page={page}&limit={limit}", logger=None, sleep_time=0
@@ -118,10 +189,10 @@ def _recent_history_entries(
 def _display_history_entry(entry: HistoryEntry, include_id: bool = False) -> str:
     from traktexport.dal import Movie, Episode
 
-    watched_at = entry.watched_at.strftime("%Y-%m-%d %H:%M:%S")
+    watched_at = entry.watched_at.astimezone().strftime("%Y-%m-%d %H:%M:%S")
     s: str
     if isinstance(entry.media_data, Movie):
-        s = f"{watched_at} {entry.action} {entry.media_data.title}"
+        s = f"{watched_at} {entry.media_data.title}"
     elif isinstance(entry.media_data, Episode):
         ep = entry.media_data
         assert isinstance(ep, Episode)
@@ -151,8 +222,7 @@ def unwatch(interactive: bool) -> None:
     """
     from traktexport.export import _trakt_request
 
-    assert USERNAME is not None
-    data = list(_recent_history_entries(username=USERNAME, limit=10))
+    data = list(_recent_history_entries(limit=10))
     picked: HistoryEntry = data[0]
     if interactive:
         _print_recent_history(data, include_id=True)
@@ -181,19 +251,49 @@ def unwatch(interactive: bool) -> None:
         sleep_time=0,
     )
 
-    click.echo(resp)
-    _print_recent_history(
-        _recent_history_entries(username=USERNAME, limit=10), include_id=True
-    )
+    _print_response(resp)
+    _print_recent_history(_recent_history_entries(limit=10), include_id=True)
 
 
 @main.command(short_help="show recent history")
-def recent() -> None:
+@click.argument("limit", type=click.IntRange(min=1, max=100), default=10)
+def recent(limit: int) -> None:
     """
     Show recent history
     """
-    assert USERNAME is not None
-    _print_recent_history(_recent_history_entries(username=USERNAME, limit=10))
+    _print_recent_history(_recent_history_entries(limit=limit))
+
+
+def _rate_movie(input: Input, rating: int) -> None:
+    if isinstance(input, MovieId):
+        mv = input.trakt()
+        _print_response(mv.rate(rating))
+    elif isinstance(input, EpisodeId):
+        ep = input.trakt()
+        _print_response(ep.rate(rating))
+    elif isinstance(input, TVShowId):
+        tv = input.trakt()
+        _print_response(tv.rate(rating))
+    else:
+        raise ValueError(f"Invalid input type: {type(input)}")
+
+
+@main.command(short_help="rate movie/tv show/episode")
+@click.option("--url", help="URL to rate", required=True, prompt=True)
+@click.option(
+    "-r",
+    "--rating",
+    help="Rating (1-10)",
+    type=click.IntRange(min=1, max=10),
+    required=True,
+    prompt=True,
+)
+def rate(url: str, rating: int) -> None:
+    """
+    Pass the movie/TV show/episode url to rate it
+    """
+    input = _parse_url_to_input(url)
+    _rate_movie(input, rating)
 
 
 if __name__ == "__main__":
