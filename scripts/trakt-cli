@@ -8,6 +8,7 @@ this is very unstable, it is super basic right now
 
 # TODO:
 # - allow watch to search instead of just using the url
+# - improve _print_response to print a nicer response rather than the dict
 
 import json
 from typing import (
