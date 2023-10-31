@@ -190,12 +190,11 @@ $ trakt-cli recent
 ```
 
 ```bash
-$ trakt-cli watch
-Url: https://trakt.tv/movies/possession-1981
+$ trakt-cli watch --at '10m ago' --url https://trakt.tv/movies/possession-1981
 Added count:
 Movies: 1
 
-Set rating? [Y/n]: 
+Set rating? [Y/n]:
 Rating: 9
 Added count:
 Movies: 1
