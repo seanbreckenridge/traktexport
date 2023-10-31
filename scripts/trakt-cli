@@ -86,7 +86,44 @@ class TVShowId(NamedTuple):
 Input = Union[MovieId, EpisodeId, TVShowId]
 
 
+def _print_response_pretty(d: Any) -> bool:
+    if not isinstance(d, dict):
+        return False
+    try:
+        if "added" in d or "deleted" in d:
+            key = "added" if "added" in d else "deleted"
+            if d[key]["movies"] or d[key]["episodes"]:
+                click.secho(f"{key.capitalize()} count:", bold=True, fg="green")
+                if d[key]["movies"]:
+                    click.echo(f"Movies: {d[key]['movies']}")
+                if d[key]["episodes"]:
+                    click.echo(f"Episodes: {d[key]['episodes']}")
+        else:
+            return False
+
+        not_found_lines = []
+        for k, v in d["not_found"].items():
+            # return false so whole error gets printed
+            if not isinstance(v, list):
+                return False
+            for item in v:
+                not_found_lines.append(f"{k}: {repr(item)}")
+
+        if not_found_lines:
+            click.secho("Not found:", bold=True, fg="red")
+            for line in not_found_lines:
+                click.echo(line)
+
+        click.echo()
+        return True
+    except Exception:
+        # if failed to access any of the keys, skip nice print
+        return False
+
+
 def _print_response(d: Any) -> None:
+    if _print_response_pretty(d):
+        return
     if isinstance(d, dict):
         click.echo(json.dumps(d, indent=2), err=True)
     else:
@@ -210,14 +247,15 @@ def _print_recent_history(
     history: Iterable[HistoryEntry], include_id: bool = False
 ) -> None:
     history = list(history)  # consume so the request happens
-    click.secho("Recent history:\n", bold=True)
+    click.secho("Recent history:", bold=True)
     for i, entry in enumerate(history, 1):
         click.echo(f"{i}: {_display_history_entry(entry, include_id=include_id)}")
 
 
 @main.command(short_help="remove recent watched item")
 @click.option("-i/-a", "--interactive/--non-interactive", default=True, is_flag=True)
-def unwatch(interactive: bool) -> None:
+@click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation")
+def unwatch(interactive: bool, yes: bool) -> None:
     """
     Remove the last watched item from your history
     """
@@ -237,10 +275,11 @@ def unwatch(interactive: bool) -> None:
 
         picked = data[picked_int - 1]
 
-    click.echo(f"Removing {picked}...")
+    click.echo(f"Removing {_display_history_entry(picked, include_id=True)}...")
 
     last_history_id = picked.history_id
-    click.confirm(f"Remove {picked}?", abort=True, default=True)
+    if not yes:
+        click.confirm("Remove from history?", abort=True, default=True)
 
     click.echo(f"Removing {last_history_id}...")
 

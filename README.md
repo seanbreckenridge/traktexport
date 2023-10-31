@@ -190,25 +190,16 @@ $ trakt-cli recent
 ```
 
 ```bash
-$ trakt-cli watch -a '10m ago'                                                
-Date: 2023-10-26 13:24:26.447999
+$ trakt-cli watch
 Url: https://trakt.tv/movies/possession-1981
-{
-  "added": {
-    "movies": 1,
-    "episodes": 0
-  }
-  ...
-}
+Added count:
+Movies: 1
+
 Set rating? [Y/n]: 
 Rating: 9
-{
-  "added": {
-    "movies": 1,
-    "shows": 0,
-    "seasons": 0,
-    "episodes": 0
-  }
-  ...
-}
+Added count:
+Movies: 1
+
+Recent history:
+1: 2023-10-31 11:35:28 Possession
 ```
