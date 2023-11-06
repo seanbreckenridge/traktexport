@@ -7,11 +7,11 @@ this is very unstable, it is super basic right now
 """
 
 # TODO:
-# - allow watch to search instead of just using the url
-# - improve _print_response to print a nicer response rather than the dict
+# - allow setting limit for unwatch, or an offset?
 
 import json
 from typing import (
+    Literal,
     Optional,
     NamedTuple,
     Union,
@@ -27,6 +27,7 @@ from traktexport.export import _check_config
 
 from trakt.movies import Movie  # type: ignore[import]
 from trakt.tv import TVShow, TVEpisode  # type: ignore[import]
+from trakt.sync import search  # type: ignore[import]
 
 _check_config()
 
@@ -169,8 +170,8 @@ def _mark_watched(input: Input, watched_at: Optional[datetime] = None) -> None:
 
 
 def _parse_datetime(
-    ctx: click.Context, param: click.Argument, value: str
-) -> Optional[datetime]:
+    ctx: click.Context, param: click.Argument, value: Optional[str]
+) -> Union[datetime, None, Literal["released"]]:
     import dateparser
     import warnings
 
@@ -181,6 +182,8 @@ def _parse_datetime(
         return None
 
     ds = value.strip()
+    if ds == "released":
+        return "released"
     dt = dateparser.parse(ds)
     if dt is None:
         raise click.BadParameter(f"Could not parse '{ds}' into a date")
@@ -191,18 +194,94 @@ def _parse_datetime(
         return datetime.fromtimestamp(ts, tz=timezone.utc)
 
 
+def _display_search_entry(entry: Any, *, include_slug: bool = False) -> str:
+    buf: str = ""
+    if isinstance(entry, Movie):
+        buf += f"Movie:\t{entry.title} ({entry.year})"
+    elif isinstance(entry, TVEpisode):
+        buf += f"Episode:\t{entry.show} S{entry.season}E{entry.episode} - {entry.title}"
+    elif isinstance(entry, TVShow):
+        buf += f"Show:\t{entry.title}"
+    else:
+        raise ValueError(f"Invalid entry type: {type(entry)}")
+
+    if include_slug:
+        buf += f" | {entry.ext}"
+
+    return buf
+
+
+def _search_trakt() -> Optional[Input]:
+    # prompt user to ask if they want to search for a
+    # particular type of media, else just search for all
+    # types
+    click.echo(
+        "What type of media do you want to search for?\n[M]ovie, [S]how, [E]pisode, [U]rl, [A]ll: ",
+        nl=False,
+    )
+    pressed = click.getchar().upper()
+    click.echo()
+    # 'movie', 'show', 'episode', or 'person'
+    pressed = pressed if pressed in ["M", "S", "E", "A", "U"] else "A"
+    if pressed == "U":
+        return None
+    media_type: Optional[str] = {
+        "M": "movie",
+        "S": "show",
+        "E": "episode",
+        "A": None,
+    }.get(pressed)
+
+    search_term = click.prompt("Search for", type=str)
+    results = search(search_term, search_type=media_type)  # type: ignore[arg-type]
+
+    if not results:
+        raise click.ClickException("No results found")
+
+    choice: Optional[int] = None
+
+    while choice is None:
+        click.echo("Results:")
+        for i, result in enumerate(results, 1):
+            click.echo(f"{i}: {_display_search_entry(result, include_slug=True)}")
+
+        choice = click.prompt("Pick result", type=int, default=1)
+        assert choice is not None
+        if choice < 1 or choice > len(results):
+            raise click.ClickException("Invalid choice")
+
+    result = results[choice - 1]
+    result._get()
+    return _parse_url_to_input(f"https://trakt.tv/{result.ext}")
+
+
+def _handle_input(url: Optional[str]) -> Input:
+    inp: Optional[Input] = None
+    if url is not None:
+        inp = _parse_url_to_input(url)
+    else:
+        inp = _search_trakt()
+        if inp is None:
+            urlp = click.prompt("Url", type=str)
+            inp = _parse_url_to_input(urlp)
+    assert inp is not None
+    return inp
+
+
 @main.command(short_help="mark movie/episode as watched")
-@click.option("--url", help="URL to watch", required=True, prompt=True)
+@click.option("--url", help="URL to watch", required=False, default=None)
 @click.option(
-    "-a", "--at", help="Watched at time", callback=_parse_datetime, default=None
+    "-a",
+    "--at",
+    help="Watched at time (date like string, or 'released')",
+    callback=_parse_datetime,
+    default=None,
 )
-def watch(url: str, at: Optional[datetime]) -> None:
+def watch(url: Optional[str], at: Optional[datetime]) -> None:
     """
     Pass the movie/episode url to mark it as watched right now
     """
-    assert USERNAME is not None
-    input = _parse_url_to_input(url)
-    _mark_watched(input, at)
+    _mark_watched(_handle_input(url), at)
     _print_recent_history(_recent_history_entries(limit=10))
 
 
@@ -319,7 +398,7 @@ def _rate_movie(input: Input, rating: int) -> None:
 
 
 @main.command(short_help="rate movie/tv show/episode")
-@click.option("--url", help="URL to rate", required=True, prompt=True)
+@click.option("--url", help="URL to rate", default=None)
 @click.option(
     "-r",
     "--rating",
@@ -328,12 +407,11 @@ def _rate_movie(input: Input, rating: int) -> None:
     required=True,
     prompt=True,
 )
-def rate(url: str, rating: int) -> None:
+def rate(url: Optional[str], rating: int) -> None:
     """
     Pass the movie/TV show/episode url to rate it
     """
-    input = _parse_url_to_input(url)
-    _rate_movie(input, rating)
+    _rate_movie(_handle_input(url), rating)
 
 
 if __name__ == "__main__":
