@@ -151,12 +151,16 @@ def _parse_url_to_input(url: str) -> Input:
             raise ValueError(f"Invalid URL parts: {prts}")
 
 
-def _mark_watched(input: Input, watched_at: Optional[datetime] = None) -> None:
+def _mark_watched(
+    input: Input, *, watched_at: Optional[datetime] = None, rating: Optional[int] = None
+) -> None:
     if isinstance(input, MovieId):
         mv = input.trakt()
         _print_response(mv.mark_as_seen(watched_at=watched_at))
-        if click.confirm("Set rating?", default=True):
-            rating = click.prompt("Rating", type=int)
+        if rating is not None or click.confirm("Set rating?", default=True):
+            if not rating:
+                rating = click.prompt("Rating", type=int)
+            assert isinstance(rating, int)
             _print_response(mv.rate(rating))
     elif isinstance(input, EpisodeId):
         ep = input.trakt()
@@ -255,7 +259,9 @@ def _search_trakt() -> Optional[Input]:
     return _parse_url_to_input(f"https://trakt.tv/{result.ext}")
 
 
-def _handle_input(url: Optional[str]) -> Input:
+def _handle_input(
+    ctx: click.Context, param: click.Argument, url: Optional[str]
+) -> Input:
     inp: Optional[Input] = None
     if url is not None:
         inp = _parse_url_to_input(url)
@@ -269,7 +275,15 @@ def _handle_input(url: Optional[str]) -> Input:
 
 
 @main.command(short_help="mark movie/episode as watched")
-@click.option("--url", help="URL to watch", required=False, default=None)
+@click.option(
+    "--url",
+    "inp",
+    help="URL to watch",
+    required=False,
+    default=None,
+    type=click.UNPROCESSED,
+    callback=_handle_input,
+)
 @click.option(
     "-a",
     "--at",
@@ -277,11 +291,18 @@ def _handle_input(url: Optional[str]) -> Input:
     callback=_parse_datetime,
     default=None,
 )
-def watch(url: Optional[str], at: Optional[datetime]) -> None:
+@click.option(
+    "-r",
+    "--rating",
+    help="Rating",
+    type=click.IntRange(min=1, max=10),
+    default=None,
+)
+def watch(inp: Input, at: Optional[datetime], rating: Optional[int]) -> None:
     """
     Pass the movie/episode url to mark it as watched right now
     """
-    _mark_watched(_handle_input(url), at)
+    _mark_watched(inp, watched_at=at, rating=rating)
     _print_recent_history(_recent_history_entries(limit=10))
 
 
@@ -398,20 +419,27 @@ def _rate_movie(input: Input, rating: int) -> None:
 
 
 @main.command(short_help="rate movie/tv show/episode")
-@click.option("--url", help="URL to rate", default=None)
+@click.option(
+    "--url",
+    "inp",
+    help="URL to rate",
+    default=None,
+    type=str,
+    callback=_handle_input,
+)
 @click.option(
     "-r",
     "--rating",
-    help="Rating (1-10)",
+    help="Rating",
     type=click.IntRange(min=1, max=10),
     required=True,
     prompt=True,
 )
-def rate(url: Optional[str], rating: int) -> None:
+def rate(inp: Input, rating: int) -> None:
     """
     Pass the movie/TV show/episode url to rate it
     """
-    _rate_movie(_handle_input(url), rating)
+    _rate_movie(inp, rating)
 
 
 if __name__ == "__main__":
