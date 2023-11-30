@@ -27,6 +27,7 @@ from traktexport.export import _check_config
 
 from trakt.movies import Movie  # type: ignore[import]
 from trakt.tv import TVShow, TVEpisode  # type: ignore[import]
+from trakt.people import Person  # type: ignore[import]
 from trakt.sync import search  # type: ignore[import]
 
 _check_config()
@@ -87,14 +88,17 @@ class TVShowId(NamedTuple):
 Input = Union[MovieId, EpisodeId, TVShowId]
 
 
-def _print_response_pretty(d: Any) -> bool:
+def _print_response_pretty(d: Any, rating: bool = False) -> bool:
     if not isinstance(d, dict):
         return False
     try:
         if "added" in d or "deleted" in d:
             key = "added" if "added" in d else "deleted"
             if d[key]["movies"] or d[key]["episodes"]:
-                click.secho(f"{key.capitalize()} count:", bold=True, fg="green")
+                print_text = "Added" if key == "added" else "Removed"
+                if rating:
+                    print_text += " rating"
+                click.secho(f"{print_text}:", bold=True, fg="green")
                 if d[key]["movies"]:
                     click.echo(f"Movies: {d[key]['movies']}")
                 if d[key]["episodes"]:
@@ -111,7 +115,7 @@ def _print_response_pretty(d: Any) -> bool:
                 not_found_lines.append(f"{k}: {repr(item)}")
 
         if not_found_lines:
-            click.secho("Not found:", bold=True, fg="red")
+            click.secho("Not found:", bold=True, fg="red", err=True)
             for line in not_found_lines:
                 click.echo(line)
 
@@ -122,8 +126,8 @@ def _print_response_pretty(d: Any) -> bool:
         return False
 
 
-def _print_response(d: Any) -> None:
-    if _print_response_pretty(d):
+def _print_response(d: Any, rating: bool = False) -> None:
+    if _print_response_pretty(d, rating=rating):
         return
     if isinstance(d, dict):
         click.echo(json.dumps(d, indent=2), err=True)
@@ -136,7 +140,11 @@ def _parse_url_to_input(url: str) -> Input:
 
     parts = urlsplit(url)
     if parts.netloc != "trakt.tv":
-        raise ValueError(f"Invalid URL netloc: {parts.netloc}, expected trakt.tv")
+        click.secho(
+            f"Warning; Invalid URL netloc: {parts.netloc}, expected trakt.tv",
+            fg="yellow",
+            err=True,
+        )
 
     prts = [u.strip() for u in parts.path.split("/") if u.strip()]
 
@@ -152,7 +160,10 @@ def _parse_url_to_input(url: str) -> Input:
 
 
 def _mark_watched(
-    input: Input, *, watched_at: Optional[datetime] = None, rating: Optional[int] = None
+    input: Input,
+    *,
+    watched_at: Union[datetime, None, Literal["released"]] = None,
+    rating: Optional[int] = None,
 ) -> None:
     if isinstance(input, MovieId):
         mv = input.trakt()
@@ -161,14 +172,14 @@ def _mark_watched(
             if not rating:
                 rating = click.prompt("Rating", type=int)
             assert isinstance(rating, int)
-            _print_response(mv.rate(rating))
+            _print_response(mv.rate(rating), rating=True)
     elif isinstance(input, EpisodeId):
         ep = input.trakt()
         _print_response(ep.mark_as_seen(watched_at=watched_at))
     elif isinstance(input, TVShowId):
-        raise NotImplementedError(
-            "TVShow not implemented, this would probably mean watch an entire show?"
-        )
+        # prompt user if they want to watch an entire show or just an episode
+        if click.confirm("Really mark entire show as watched?", default=False):
+            _print_response(input.trakt().mark_as_seen(watched_at=watched_at))
     else:
         raise ValueError(f"Invalid input type: {type(input)}")
 
@@ -205,7 +216,9 @@ def _display_search_entry(entry: Any, *, include_slug: bool = False) -> str:
     elif isinstance(entry, TVEpisode):
         buf += f"Episode:\t{entry.show} S{entry.season}E{entry.episode} - {entry.title}"
     elif isinstance(entry, TVShow):
-        buf += f"Show:\t{entry.title}"
+        buf += f"Show:\t{entry.title} ({entry.year})"
+    elif isinstance(entry, Person):
+        buf += f"Person:\t{entry.name}"
     else:
         raise ValueError(f"Invalid entry type: {type(entry)}")
 
@@ -215,28 +228,51 @@ def _display_search_entry(entry: Any, *, include_slug: bool = False) -> str:
     return buf
 
 
+def _handle_pick_result(
+    user_input: str,
+) -> Optional[int]:
+    if user_input.strip() in {"n", "q"}:
+        raise click.Abort()
+    try:
+        choice = int(user_input)
+        return choice
+    except ValueError:
+        click.secho(f"Could not parse '{user_input}' into a number", fg="red", err=True)
+        return None
+
+
+allowed = ["M", "S", "I", "E", "A", "U"]
+
+
 def _search_trakt() -> Optional[Input]:
     # prompt user to ask if they want to search for a
     # particular type of media, else just search for all
     # types
     click.echo(
-        "What type of media do you want to search for?\n[M]ovie, [S]how, [E]pisode, [U]rl, [A]ll: ",
+        "[M]ovie\n[S]how\n[E]pisode name\nEp[I]sode - Show w/ Season/Episode num\n[U]rl\n[A]ll\nWhat type of media do you want to search for? ",
         nl=False,
     )
     pressed = click.getchar().upper()
     click.echo()
+    if pressed not in allowed:
+        click.secho(
+            f"Invalid choice: {pressed}, should be one of ({', '.join(allowed)})",
+            fg="red",
+            err=True,
+        )
     # 'movie', 'show', 'episode', or 'person'
-    pressed = pressed if pressed in ["M", "S", "E", "A", "U"] else "A"
+    pressed = pressed if pressed in allowed else "A"
     if pressed == "U":
         return None
     media_type: Optional[str] = {
         "M": "movie",
         "S": "show",
+        "I": "show",
         "E": "episode",
         "A": None,
     }.get(pressed)
 
-    search_term = click.prompt("Search for", type=str)
+    search_term = click.prompt(f"Search for {media_type or 'all'}", type=str)
     results = search(search_term, search_type=media_type)  # type: ignore[arg-type]
 
     if not results:
@@ -249,14 +285,26 @@ def _search_trakt() -> Optional[Input]:
         for i, result in enumerate(results, 1):
             click.echo(f"{i}: {_display_search_entry(result, include_slug=True)}")
 
-        choice = click.prompt("Pick result", type=int, default=1)
-        assert choice is not None
+        choice = click.prompt(
+            f"Pick result - enter 1-{len(results)}, or q to quit",
+            default="1",
+            value_proc=_handle_pick_result,
+        )
+        if choice is None:
+            continue
+        assert isinstance(choice, int), f"Invalid choice type: {choice} {type(choice)}"
         if choice < 1 or choice > len(results):
-            raise click.ClickException("Invalid choice")
+            click.secho(f"Invalid choice, must be 1-{len(results)}", fg="red", err=True)
+            choice = None
 
     result = results[choice - 1]
     result._get()
-    return _parse_url_to_input(f"https://trakt.tv/{result.ext}")
+    inp: Input = _parse_url_to_input(f"https://trakt.tv/{result.ext}")
+    if pressed == "I":
+        season = click.prompt("Season", type=int)
+        episode = click.prompt("Episode", type=int)
+        inp = EpisodeId(inp.id, season, episode)
+    return inp
 
 
 def _handle_input(
@@ -298,7 +346,9 @@ def _handle_input(
     type=click.IntRange(min=1, max=10),
     default=None,
 )
-def watch(inp: Input, at: Optional[datetime], rating: Optional[int]) -> None:
+def watch(
+    inp: Input, at: Union[datetime, Literal["released"], None], rating: Optional[int]
+) -> None:
     """
     Pass the movie/episode url to mark it as watched right now
     """
@@ -364,14 +414,21 @@ def unwatch(interactive: bool, yes: bool) -> None:
     data = list(_recent_history_entries(limit=10))
     picked: HistoryEntry = data[0]
     if interactive:
+        picked_int: Optional[int] = None
         _print_recent_history(data, include_id=True)
-        picked_int: int = click.prompt(
-            "Pick item (number) to remove",
-            type=int,
-            default=1,
-        )
-        if picked_int < 1 or picked_int > len(data):
-            raise click.ClickException("Invalid choice")
+        while picked_int is None:
+            picked_int = click.prompt(
+                "Pick item to remove, q to quit",
+                default="1",
+                value_proc=_handle_pick_result,
+            )
+            if picked_int is None:
+                continue
+            if picked_int < 1 or picked_int > len(data):
+                picked_int = None
+                click.secho(
+                    f"Invalid choice, must be 1-{len(data)}", fg="red", err=True
+                )
 
         picked = data[picked_int - 1]
 
@@ -407,13 +464,13 @@ def recent(limit: int) -> None:
 def _rate_movie(input: Input, rating: int) -> None:
     if isinstance(input, MovieId):
         mv = input.trakt()
-        _print_response(mv.rate(rating))
+        _print_response(mv.rate(rating), rating=True)
     elif isinstance(input, EpisodeId):
         ep = input.trakt()
-        _print_response(ep.rate(rating))
+        _print_response(ep.rate(rating), rating=True)
     elif isinstance(input, TVShowId):
         tv = input.trakt()
-        _print_response(tv.rate(rating))
+        _print_response(tv.rate(rating), rating=True)
     else:
         raise ValueError(f"Invalid input type: {type(input)}")
 
