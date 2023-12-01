@@ -11,6 +11,7 @@ this is very unstable, it is super basic right now
 
 import json
 from typing import (
+    get_args,
     Literal,
     Optional,
     NamedTuple,
@@ -358,17 +359,23 @@ def watch(
 
 from traktexport.dal import _parse_history, HistoryEntry
 
+HistoryType = Literal["movies", "shows", "seasons", "episodes"]
+
 
 def _recent_history_entries(
-    *, limit: int = 10, page: int = 1
+    *, limit: int = 10, page: int = 1, history_type: Optional[HistoryType] = None
 ) -> Iterator[HistoryEntry]:
     from traktexport.export import _trakt_request
 
     username = USERNAME
     assert username is not None
 
+    url_parts = ["users", username, "history"]
+    if history_type is not None:
+        url_parts.append(history_type)
+
     data = _trakt_request(
-        f"users/{username}/history?page={page}&limit={limit}", logger=None, sleep_time=0
+        f"{'/'.join(url_parts)}?page={page}&limit={limit}", logger=None, sleep_time=0
     )
 
     yield from _parse_history(data)
@@ -378,19 +385,19 @@ def _display_history_entry(entry: HistoryEntry, include_id: bool = False) -> str
     from traktexport.dal import Movie, Episode
 
     watched_at = entry.watched_at.astimezone().strftime("%Y-%m-%d %H:%M:%S")
-    s: str
+    buf: str
     if isinstance(entry.media_data, Movie):
-        s = f"{watched_at} {entry.media_data.title}"
+        buf = f"{watched_at} {entry.media_data.title}"
     elif isinstance(entry.media_data, Episode):
         ep = entry.media_data
         assert isinstance(ep, Episode)
-        s = f"{watched_at} {ep.show.title} S{ep.season}E{ep.episode} - {ep.title}"
+        buf = f"{watched_at} {ep.show.title} S{ep.season}E{ep.episode} - {ep.title}"
     else:
         raise ValueError(f"Invalid media_type: {entry.media_type}")
 
     if include_id:
-        s += f" ({entry.history_id})"
-    return s
+        buf += f" ({entry.history_id})"
+    return buf
 
 
 def _print_recent_history(
@@ -405,13 +412,14 @@ def _print_recent_history(
 @main.command(short_help="remove recent watched item")
 @click.option("-i/-a", "--interactive/--non-interactive", default=True, is_flag=True)
 @click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation")
-def unwatch(interactive: bool, yes: bool) -> None:
+@click.argument("limit", type=int, default=10)
+def unwatch(interactive: bool, yes: bool, limit: int) -> None:
     """
     Remove the last watched item from your history
     """
     from traktexport.export import _trakt_request
 
-    data = list(_recent_history_entries(limit=10))
+    data = list(_recent_history_entries(limit=limit))
     picked: HistoryEntry = data[0]
     if interactive:
         picked_int: Optional[int] = None
@@ -449,16 +457,24 @@ def unwatch(interactive: bool, yes: bool) -> None:
     )
 
     _print_response(resp)
-    _print_recent_history(_recent_history_entries(limit=10), include_id=True)
+    _print_recent_history(_recent_history_entries(limit=limit), include_id=True)
 
 
 @main.command(short_help="show recent history")
-@click.argument("limit", type=click.IntRange(min=1, max=100), default=10)
-def recent(limit: int) -> None:
+@click.option(
+    "-t",
+    "--type",
+    "history_type",
+    type=click.Choice(list(get_args(HistoryType)), case_sensitive=False),
+)
+@click.argument("limit", type=int, default=10)
+def recent(limit: int, history_type: Optional[HistoryType]) -> None:
     """
     Show recent history
     """
-    _print_recent_history(_recent_history_entries(limit=limit))
+    _print_recent_history(
+        _recent_history_entries(limit=limit, history_type=history_type)
+    )
 
 
 def _rate_movie(input: Input, rating: int) -> None:
