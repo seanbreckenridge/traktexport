@@ -359,7 +359,7 @@ def watch(
 
 from traktexport.dal import _parse_history, HistoryEntry
 
-HistoryType = Literal["movies", "shows", "seasons", "episodes"]
+HistoryType = Literal["movies", "episodes"]
 
 
 def _recent_history_entries(
