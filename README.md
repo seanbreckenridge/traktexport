@@ -4,6 +4,8 @@ Export your Movie/TV shows ratings and history from https://trakt.tv/
 
 This isn't meant to be used to re-import info back into Trakt or export to another site, its just meant to save all my data so I have it locally, and can do analysis or graph my history (e.g., on [my feed](https://sean.fish/feed/?order_by=when&sort=desc&ftype=trakt_history_episode%2Ctrakt_history_movie))
 
+This is also used internally in [trakt-watch](https://github.com/seanbreckenridge/trakt-watch/tree/main), a small CLI to let you mark episodes/movies as watched on Trakt
+
 ## Installation
 
 Requires `python3.8+`
@@ -152,53 +154,3 @@ Note: This does include this info the export, but it doesn't currently parse:
 ... because I don't have any of those on trakt. If you use those, a PR would be appreciated!
 
 Created to use as part of [`HPI`](https://github.com/seanbreckenridge/HPI)
-
-## trakt-cli
-
-For now will publish the [trakt-cli](./scripts/trakt-cli) here while I'm developing it, you'd need to just clone and copy it onto your `$PATH` somewhere.
-
-Will probably separate this into its own repo at some point
-
-Lets me quickly mark something done using the URL:
-
-```
-Usage: trakt-cli [OPTIONS] COMMAND [ARGS]...
-
-Options:
-  -u, --username TEXT  Trakt username  [env var: TRAKT_USERNAME; required]
-  --help               Show this message and exit.
-
-Commands:
-  rate     rate movie/tv show/episode
-  recent   show recent history
-  unwatch  remove recent watched item
-  watch    mark movie/episode as watched
-```
-
-```bash
-$ trakt-cli recent
-2023-10-21 22:24:59 Stuff Made Here S2023E1 - I sent robot forgeries to a handwriting expert
-2023-10-21 22:18:10 Possession
-2023-10-21 19:33:15 Stuff Made Here S2023E2 - I made 6 absurd pencil sharpeners
-2023-10-20 14:30:00 Killers of the Flower Moon
-2023-10-18 23:49:06 RWBY S9E10 - Of Solitude and Self
-2023-10-18 17:28:11 RWBY S9E9 - A Tale Involving a Tree
-2023-10-17 18:32:29 RWBY S9E8 - Tea Amidst Terrible Trouble
-2023-10-17 17:51:30 RWBY S9E7 - The Perils of Paper Houses
-2023-10-15 22:39:51 The Wicker Man
-2023-10-15 18:54:01 How to Blow Up a Pipeline
-```
-
-```bash
-$ trakt-cli watch --at '10m ago' --url https://trakt.tv/movies/possession-1981
-Added count:
-Movies: 1
-
-Set rating? [Y/n]:
-Rating: 9
-Added count:
-Movies: 1
-
-Recent history:
-1: 2023-10-31 11:35:28 Possession
-```
